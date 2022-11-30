@@ -12,7 +12,7 @@ import (
 )
 
 type CredentialManager struct {
-	hmac hash.Hash
+	hash.Hash
 }
 
 // NewCrednetialManager creates a new CredentialManager which can create and verify signed credentials
@@ -29,9 +29,9 @@ func (c *CredentialManager) signCredential(credential *pb.SignedCredential) erro
 		return errors.Wrap(err, "Error serializing HMAC protobuf body")
 	}
 
-	c.hmac.Write(bytes)
-	credential.Signature = c.hmac.Sum(nil)
-	c.hmac.Reset()
+	c.Write(bytes)
+	credential.Signature = c.Sum(nil)
+	c.Reset()
 
 	return nil
 }

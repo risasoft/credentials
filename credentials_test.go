@@ -134,3 +134,31 @@ func TestHmacKey(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+// TestCredentialManagerReuse tests that subsequent calls to the same CredentialManager preduce predictable results
+func TestCredentialManagerReuse(t *testing.T) {
+	cm := NewCredentialManager(sha1.New, []byte("Off with their heads!"))
+
+	nodeId, err := hex.DecodeString("1234567890123456789012345678901234567890")
+	if err != nil {
+		t.Error(err)
+	}
+	cred, err := cm.Create(time.Now(), nodeId)
+	if err != nil {
+		t.Error(err)
+	}
+	cred2, err := cm.Create(time.Now(), nodeId)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = cm.Verify(cred)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = cm.Verify(cred2)
+	if err != nil {
+		t.Error(err)
+	}
+}
