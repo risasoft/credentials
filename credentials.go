@@ -11,63 +11,64 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// CredentialManager authenticates and verifies rescue node credentials
 type CredentialManager struct {
 	hash.Hash
 }
 
-// NewCrednetialManager creates a new CredentialManager which can create and verify signed credentials
+// NewCredentialManager creates a new CredentialManager which can create and verify authenticated credentials
 func NewCredentialManager(h func() hash.Hash, key []byte) *CredentialManager {
 	return &CredentialManager{
 		hmac.New(h, key),
 	}
 }
 
-func (c *CredentialManager) signCredential(credential *pb.SignedCredential) error {
-	// Serialize just the inner message so we can sign it and add it to the outer message
+func (c *CredentialManager) authenticateCredential(credential *pb.AuthenticatedCredential) error {
+	// Serialize just the inner message so we can authenticate it and add it to the outer message
 	bytes, err := proto.Marshal(credential.Credential)
 	if err != nil {
 		return errors.Wrap(err, "Error serializing HMAC protobuf body")
 	}
 
 	c.Write(bytes)
-	credential.Signature = c.Sum(nil)
+	credential.Mac = c.Sum(nil)
 	c.Reset()
 
 	return nil
 }
 
-// Create makes a new credential and signs it, returning a protoc struct that can be marshaled/unmarshaled
-func (c *CredentialManager) Create(timestamp time.Time, nodeId []byte) (*pb.SignedCredential, error) {
-	if len(nodeId) != 20 {
-		return nil, fmt.Errorf("Invalid nodeId length. Expected 20, got %d\n", len(nodeId))
+// Create makes a new credential and authenticates it, returning a protoc struct that can be marshaled/unmarshaled
+func (c *CredentialManager) Create(timestamp time.Time, nodeID []byte) (*pb.AuthenticatedCredential, error) {
+	if len(nodeID) != 20 {
+		return nil, fmt.Errorf("invalid nodeID length. Expected 20, got %d", len(nodeID))
 	}
-	message := pb.SignedCredential{}
+	message := pb.AuthenticatedCredential{}
 	message.Credential = &pb.Credential{}
-	message.Credential.NodeId = nodeId
+	message.Credential.NodeId = nodeID
 	message.Credential.Timestamp = timestamp.Unix()
 
-	if err := c.signCredential(&message); err != nil {
+	if err := c.authenticateCredential(&message); err != nil {
 		return nil, err
 	}
 
 	return &message, nil
 }
 
-// Verify checks that a SignedCredential has a valid signature
-func (c *CredentialManager) Verify(signedCredential *pb.SignedCredential) error {
-	// Create a temporary SignedCredential and borrow the inner message from the provided credential
-	tmp := pb.SignedCredential{}
-	tmp.Credential = signedCredential.Credential
+// Verify checks that a AuthenticatedCredential has a valid mac
+func (c *CredentialManager) Verify(authenticatedCredential *pb.AuthenticatedCredential) error {
+	// Create a temporary AuthenticatedCredential and borrow the inner message from the provided credential
+	tmp := pb.AuthenticatedCredential{}
+	tmp.Credential = authenticatedCredential.Credential
 
-	// Sign tmp
-	if err := c.signCredential(&tmp); err != nil {
-		return errors.Wrap(err, "Error while re-creating the signature")
+	// Auth tmp
+	if err := c.authenticateCredential(&tmp); err != nil {
+		return errors.Wrap(err, "Error while re-creating the MAC")
 	}
 
-	// Check that tmp's signature matches the provided one.
-	if hmac.Equal(tmp.Signature, signedCredential.Signature) == false {
-		// Signatures didn't match. Authenticity cannot be verified.
-		return errors.New("Credential signature mismatch.")
+	// Check that tmp's MAC matches the provided one.
+	if hmac.Equal(tmp.Mac, authenticatedCredential.Mac) == false {
+		// MAC didn't match. Authenticity cannot be verified.
+		return errors.New("credential MAC mismatch")
 	}
 
 	return nil

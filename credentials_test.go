@@ -13,15 +13,15 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// TestCredentialRoundTrip creates, signs, marshals, encodes, decodes, unmarshals, and verifies a credential
+// TestCredentialRoundTrip creates, anthenticates, marshals, encodes, decodes, unmarshals, and verifies a credential
 func TestCredentialRoundTrip(t *testing.T) {
 	cm := NewCredentialManager(sha1.New, []byte("Curiouser and curiouser"))
 
-	nodeId, err := hex.DecodeString("1234567890123456789012345678901234567890")
+	nodeID, err := hex.DecodeString("1234567890123456789012345678901234567890")
 	if err != nil {
 		t.Error(err)
 	}
-	cred, err := cm.Create(time.Now(), nodeId)
+	cred, err := cm.Create(time.Now(), nodeID)
 	if err != nil {
 		t.Error(err)
 	}
@@ -47,7 +47,7 @@ func TestCredentialRoundTrip(t *testing.T) {
 		t.Error(err)
 	}
 
-	unmarshaled := &pb.SignedCredential{}
+	unmarshaled := &pb.AuthenticatedCredential{}
 	err = proto.Unmarshal(decoded, unmarshaled)
 	if err != nil {
 		t.Error(err)
@@ -68,30 +68,30 @@ func TestCredentialRoundTrip(t *testing.T) {
 	}
 }
 
-// TestCredentialStolenSignature creates 2 signed credentials, swaps their signatures, and ensures that they don't pass Verify
-func TestCredentialStolenSignature(t *testing.T) {
+// TestCredentialStolenMac creates 2 authenticated credentials, swaps their MACs, and ensures that they don't pass Verify
+func TestCredentialStolenMac(t *testing.T) {
 	cm := NewCredentialManager(sha1.New, []byte("We're all mad here"))
 
-	nodeId, err := hex.DecodeString("1234567890123456789012345678901234567890")
+	nodeID, err := hex.DecodeString("1234567890123456789012345678901234567890")
 	if err != nil {
 		t.Error(err)
 	}
-	cred, err := cm.Create(time.Now(), nodeId)
-	if err != nil {
-		t.Error(err)
-	}
-
-	nodeId2, err := hex.DecodeString("2234567890123456789012345678901234567890")
-	if err != nil {
-		t.Error(err)
-	}
-	cred2, err := cm.Create(time.Now(), nodeId2)
+	cred, err := cm.Create(time.Now(), nodeID)
 	if err != nil {
 		t.Error(err)
 	}
 
-	// Swap signatures and make sure Verify returns an error
-	cred.Signature, cred2.Signature = cred2.Signature, cred.Signature
+	nodeID2, err := hex.DecodeString("2234567890123456789012345678901234567890")
+	if err != nil {
+		t.Error(err)
+	}
+	cred2, err := cm.Create(time.Now(), nodeID2)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// Swap NACs and make sure Verify returns an error
+	cred.Mac, cred2.Mac = cred2.Mac, cred.Mac
 	err = cm.Verify(cred)
 	if err == nil {
 		t.Fail()
@@ -102,7 +102,7 @@ func TestCredentialStolenSignature(t *testing.T) {
 	}
 
 	// Swap back and make sure Verify now works
-	cred.Signature, cred2.Signature = cred2.Signature, cred.Signature
+	cred.Mac, cred2.Mac = cred2.Mac, cred.Mac
 	err = cm.Verify(cred)
 	if err != nil {
 		t.Error(err)
@@ -113,16 +113,16 @@ func TestCredentialStolenSignature(t *testing.T) {
 	}
 }
 
-// TestHmacKey sanity-tests that a signature is only valid for a given key
+// TestHmacKey sanity-tests that a MAC is only valid for a given key
 func TestHmacKey(t *testing.T) {
 	cm := NewCredentialManager(sha1.New, []byte("T'was brillig"))
 	cm2 := NewCredentialManager(sha1.New, []byte("And the slithy toves did gyre"))
 
-	nodeId, err := hex.DecodeString("1234567890123456789012345678901234567890")
+	nodeID, err := hex.DecodeString("1234567890123456789012345678901234567890")
 	if err != nil {
 		t.Error(err)
 	}
-	cred, err := cm.Create(time.Now(), nodeId)
+	cred, err := cm.Create(time.Now(), nodeID)
 
 	err = cm2.Verify(cred)
 	if err == nil {
@@ -139,15 +139,15 @@ func TestHmacKey(t *testing.T) {
 func TestCredentialManagerReuse(t *testing.T) {
 	cm := NewCredentialManager(sha1.New, []byte("Off with their heads!"))
 
-	nodeId, err := hex.DecodeString("1234567890123456789012345678901234567890")
+	nodeID, err := hex.DecodeString("1234567890123456789012345678901234567890")
 	if err != nil {
 		t.Error(err)
 	}
-	cred, err := cm.Create(time.Now(), nodeId)
+	cred, err := cm.Create(time.Now(), nodeID)
 	if err != nil {
 		t.Error(err)
 	}
-	cred2, err := cm.Create(time.Now(), nodeId)
+	cred2, err := cm.Create(time.Now(), nodeID)
 	if err != nil {
 		t.Error(err)
 	}
