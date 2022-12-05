@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Rocket-Pool-Rescue-Node/credentials/pb"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -26,7 +25,7 @@ func TestCredentialRoundTrip(t *testing.T) {
 		t.Error(err)
 	}
 
-	marshaled, err := proto.Marshal(cred)
+	marshaled, err := proto.Marshal(cred.Pb())
 	if err != nil {
 		t.Error(err)
 	}
@@ -47,8 +46,8 @@ func TestCredentialRoundTrip(t *testing.T) {
 		t.Error(err)
 	}
 
-	unmarshaled := &pb.AuthenticatedCredential{}
-	err = proto.Unmarshal(decoded, unmarshaled)
+	unmarshaled := &AuthenticatedCredential{}
+	err = proto.Unmarshal(decoded, unmarshaled.Pb())
 	if err != nil {
 		t.Error(err)
 	}
