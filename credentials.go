@@ -64,6 +64,65 @@ func (ac *AuthenticatedCredential) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func (ac *AuthenticatedCredential) Base64URLEncodeUsername() string {
+	var out bytes.Buffer
+
+	encoder := base64.NewEncoder(base64.URLEncoding, &out)
+	encoder.Write(ac.Credential.NodeId)
+	encoder.Close()
+
+	return string(out.Bytes())
+}
+
+func (ac *AuthenticatedCredential) Base64URLEncodePassword() (string, error) {
+	var out bytes.Buffer
+
+	// Save the nodeId
+	nodeID := ac.Credential.NodeId
+	// Strip it to save space
+	ac.Credential.NodeId = nil
+
+	marshaled, err := proto.Marshal(ac.Pb())
+	if err != nil {
+		return "", err
+	}
+
+	// Restore the nodeId
+	ac.Credential.NodeId = nodeID
+
+	// Encode the marshaled proto
+	encoder := base64.NewEncoder(base64.URLEncoding, &out)
+	encoder.Write(marshaled)
+	encoder.Close()
+
+	return string(out.Bytes()), nil
+}
+
+func (ac *AuthenticatedCredential) Base64URLDecode(username string, password string) error {
+	decoder := base64.NewDecoder(base64.URLEncoding, bytes.NewReader([]byte(username)))
+	nodeID, err := io.ReadAll(decoder)
+	if err != nil {
+		return err
+	}
+
+	decoder = base64.NewDecoder(base64.URLEncoding, bytes.NewReader([]byte(password)))
+	decoded, err := io.ReadAll(decoder)
+	if err != nil {
+		return err
+	}
+
+	newCred := &AuthenticatedCredential{}
+	err = proto.Unmarshal(decoded, newCred.Pb())
+	if err != nil {
+		return err
+	}
+
+	ac.Pb().Reset()
+	*ac = *newCred
+	ac.Credential.NodeId = nodeID
+	return nil
+}
+
 // CredentialManager authenticates and verifies rescue node credentials
 type CredentialManager struct {
 	hash.Hash
