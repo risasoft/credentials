@@ -58,7 +58,12 @@ func (ac *AuthenticatedCredential) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	ac.Credential.NodeId = []byte(strings.TrimPrefix(j.NodeID, "0x"))
+	nodeID, err := hex.DecodeString(strings.TrimPrefix(j.NodeID, "0x"))
+	if err != nil {
+		return err
+	}
+
+	ac.Credential.NodeId = nodeID
 	ac.Credential.Timestamp = j.Timestamp
 	ac.Mac = decoded
 	return nil
