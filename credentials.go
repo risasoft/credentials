@@ -10,6 +10,7 @@ import (
 	"hash"
 	"io"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Rocket-Pool-Rescue-Node/credentials/pb"
@@ -130,13 +131,17 @@ func (ac *AuthenticatedCredential) Base64URLDecode(username string, password str
 
 // CredentialManager authenticates and verifies rescue node credentials
 type CredentialManager struct {
-	hash.Hash
+	sync.Pool
 }
 
 // NewCredentialManager creates a new CredentialManager which can create and verify authenticated credentials
 func NewCredentialManager(h func() hash.Hash, key []byte) *CredentialManager {
 	return &CredentialManager{
-		hmac.New(h, key),
+		sync.Pool {
+			New: func() any {
+				return hmac.New(h, key)
+			},
+		},
 	}
 }
 
@@ -147,9 +152,15 @@ func (c *CredentialManager) authenticateCredential(credential *AuthenticatedCred
 		return errors.Wrap(err, "Error serializing HMAC protobuf body")
 	}
 
-	c.Write(bytes)
-	credential.Mac = c.Sum(nil)
-	c.Reset()
+	h, ok := c.Get().(hash.Hash)
+	if !ok {
+		return errors.New("Couldn't retrieve available hash from pool")
+	}
+
+	h.Write(bytes)
+	credential.Mac = h.Sum(nil)
+	h.Reset()
+	c.Put(h)
 
 	return nil
 }
