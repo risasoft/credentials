@@ -34,13 +34,16 @@ func (ac *AuthenticatedCredential) MarshalJSON() ([]byte, error) {
 	var mac bytes.Buffer
 	nodeID := "0x" + hex.EncodeToString(ac.Credential.NodeId)
 	encoder := base64.NewEncoder(base64.URLEncoding, &mac)
-	encoder.Write(ac.Mac)
+	_, err := encoder.Write(ac.Mac)
+	if err != nil {
+		return nil, err
+	}
 	encoder.Close()
 
 	return json.Marshal(&jsonAuthenticatedCredential{
 		NodeID:    nodeID,
 		Timestamp: ac.Credential.Timestamp,
-		Mac:       string(mac.Bytes()),
+		Mac:       mac.String(),
 	})
 }
 
@@ -74,10 +77,13 @@ func (ac *AuthenticatedCredential) Base64URLEncodeUsername() string {
 	var out bytes.Buffer
 
 	encoder := base64.NewEncoder(base64.URLEncoding, &out)
-	encoder.Write(ac.Credential.NodeId)
+	_, err := encoder.Write(ac.Credential.NodeId)
+	if err != nil {
+		return ""
+	}
 	encoder.Close()
 
-	return string(out.Bytes())
+	return out.String()
 }
 
 func (ac *AuthenticatedCredential) Base64URLEncodePassword() (string, error) {
@@ -98,10 +104,13 @@ func (ac *AuthenticatedCredential) Base64URLEncodePassword() (string, error) {
 
 	// Encode the marshaled proto
 	encoder := base64.NewEncoder(base64.URLEncoding, &out)
-	encoder.Write(marshaled)
+	_, err = encoder.Write(marshaled)
+	if err != nil {
+		return "", err
+	}
 	encoder.Close()
 
-	return string(out.Bytes()), nil
+	return out.String(), nil
 }
 
 func (ac *AuthenticatedCredential) Base64URLDecode(username string, password string) error {
@@ -117,14 +126,14 @@ func (ac *AuthenticatedCredential) Base64URLDecode(username string, password str
 		return err
 	}
 
-	newCred := &AuthenticatedCredential{}
+	newCred := AuthenticatedCredential{}
 	err = proto.Unmarshal(decoded, newCred.Pb())
 	if err != nil {
 		return err
 	}
 
 	ac.Pb().Reset()
-	*ac = *newCred
+	proto.Merge(ac.Pb(), newCred.Pb())
 	ac.Credential.NodeId = nodeID
 	return nil
 }
@@ -137,7 +146,7 @@ type CredentialManager struct {
 // NewCredentialManager creates a new CredentialManager which can create and verify authenticated credentials
 func NewCredentialManager(h func() hash.Hash, key []byte) *CredentialManager {
 	return &CredentialManager{
-		sync.Pool {
+		sync.Pool{
 			New: func() any {
 				return hmac.New(h, key)
 			},
@@ -194,7 +203,7 @@ func (c *CredentialManager) Verify(authenticatedCredential *AuthenticatedCredent
 	}
 
 	// Check that tmp's MAC matches the provided one.
-	if hmac.Equal(tmp.Mac, authenticatedCredential.Mac) == false {
+	if !hmac.Equal(tmp.Mac, authenticatedCredential.Mac) {
 		// MAC didn't match. Authenticity cannot be verified.
 		return errors.New("credential MAC mismatch")
 	}
