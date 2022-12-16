@@ -34,9 +34,12 @@ func TestCredentialRoundTrip(t *testing.T) {
 
 	var encoded bytes.Buffer
 	encoder := base64.NewEncoder(base64.URLEncoding, &encoded)
-	encoder.Write(marshaled)
+	_, err = encoder.Write(marshaled)
+	if err != nil {
+		t.Error(err)
+	}
 	encoder.Close()
-	t.Logf("b64 encoded proto: %s\n", string(encoded.Bytes()))
+	t.Logf("b64 encoded proto: %s\n", encoded.String())
 
 	// Now to reverse the process
 	decoder := base64.NewDecoder(base64.URLEncoding, bytes.NewReader(encoded.Bytes()))
@@ -58,7 +61,7 @@ func TestCredentialRoundTrip(t *testing.T) {
 	}
 
 	// Finally, do some sanity checks
-	if bytes.Compare(unmarshaled.Credential.NodeId, cred.Credential.NodeId) != 0 {
+	if !bytes.Equal(unmarshaled.Credential.NodeId, cred.Credential.NodeId) {
 		t.Fail()
 	}
 
@@ -121,7 +124,11 @@ func TestHmacKey(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+
 	cred, err := cm.Create(time.Now(), nodeID)
+	if err != nil {
+		t.Error(err)
+	}
 
 	err = cm2.Verify(cred)
 	if err == nil {
